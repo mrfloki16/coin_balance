@@ -1,0 +1,39 @@
+#!/bin/bash
+# Author: mr_floki
+# Date Created: 03/04/2021
+# Desciption: Print the balance of one or more crypto wallets
+# Date Modified: 03/04/2021
+
+# get balance for each coins
+function BALANCE {
+
+# declare an associative array
+declare -A coins
+
+# Set the wallets you have with the coin ID in coingecko
+coins=(["cranepay"]="cryply" ["lightbit"]="lightbit")
+
+# get balance for each coins
+for wallet in "${!coins[@]}"; do
+  # set variable for balance
+  final_balance=0
+
+  # get overall balance
+  balances=(balance immature_balance unconfirmed_balance)
+  for b in ${balances[@]}; do
+    num=$($wallet-cli getwalletinfo | jq .$b)
+    final_balance=$(echo "$num+$final_balance" | bc)
+  done
+
+  # get usb price and value of balance
+  usd=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids="${coins[$wallet]}"&vs_currencies=usd" | jq .[].usd)
+  usd_temp=$(echo "$final_balance*$usd" | bc | sed 's/^\./0./')
+  usd_final=$(printf "%.2f\n" $usd_temp)
+
+  # print the final
+  echo "${wallet^^} $final_balance, USD $usd_final\$"
+done
+}
+
+# set all together in great column
+BALANCE $coins | column -t
