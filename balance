@@ -2,38 +2,79 @@
 # Author: mr_floki
 # Date Created: 03/04/2021
 # Desciption: Print the balance of one or more crypto wallets
-# Date Modified: 03/04/2021
+# Date Modified: 11/04/2021
+
 
 # get balance for each coins
 function BALANCE {
+
+# set the column name
+echo "CORE COIN BALANCE----- USD"
 
 # declare an associative array
 declare -A coins
 
 # Set the wallets you have with the coin ID in coingecko
-coins=(["cranepay"]="cryply" ["lightbit"]="lightbit")
+##########################################################
+coins=(["cranepay"]="cryply" ["lightbit"]="lightbit" ["bitcoin"]="bitcoin")
+path=./wallets
+##########################################################
+
+# set up variable for total earning
+usd_total=0
 
 # get balance for each coins
 for wallet in "${!coins[@]}"; do
   # set variable for balance
   final_balance=0
 
+  # check if node is running
+  $wallet-cli getwalletinfo &> /dev/null
+  if [ $? -eq 0 ];
+  then
+  node=1
+  else
+  node=0
+  fi
+
   # get overall balance
   balances=(balance immature_balance unconfirmed_balance)
   for b in ${balances[@]}; do
+    if [ $node  == 1 ]; then
     num=$($wallet-cli getwalletinfo | jq .$b)
     final_balance=$(echo "$num+$final_balance" | bc)
+    else
+    num=$(cat $path/$wallet/$wallet.json | jq .$b)
+    final_balance=$(echo "$num+$final_balance" | bc)
+    fi
   done
 
-  # get usb price and value of balance
+  # check if node working
+  if [ $node == 1 ]; then
+  check="√"
+  else
+  check="x"
+  fi
+
+  # get usd price and value of balance
   usd=$(curl -s "https://api.coingecko.com/api/v3/simple/price?ids="${coins[$wallet]}"&vs_currencies=usd" | jq .[].usd)
   usd_temp=$(echo "$final_balance*$usd" | bc | sed 's/^\./0./')
   usd_final=$(printf "%.2f\n" $usd_temp)
+  final_balance_zero=$(printf "%.8f\n" $final_balance)
+  usd_total=$(echo "$usd_total+$usd_final" | bc)
 
   # print the final
-  echo "${wallet^^} $final_balance, USD $usd_final\$"
+  echo "[$check] $wallet $final_balance_zero $usd_final\$"
 done
+
+# print the total of all coins
+echo " - - TOTAL $usd_total\$"
 }
 
 # set all together in great column
+BALANCE $coins | column -t -R 3,4 2>/dev/null
+
+# check if last column version
+if [ $? -ne 0 ]; then
 BALANCE $coins | column -t
+fi
